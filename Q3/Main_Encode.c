@@ -5,13 +5,13 @@
 
 
 int main(int argc, char *argv[]) {
-    if (argc != 4) {
+    if (argc != 3) {
         fprintf(stderr, "Usage: %s <src_file> <dst_file>\n", argv[0]);
         return 1;
     }
 
-    FILE *src_file = fopen(argv[2], "r");
-    FILE *dst_file = fopen(argv[3], "w");
+    FILE *src_file = fopen(argv[1], "r");
+    FILE *dst_file = fopen(argv[2], "w");
 
     if (src_file == NULL || dst_file == NULL) {
         perror("Error opening files");
@@ -35,10 +35,11 @@ int main(int argc, char *argv[]) {
 
     fread(textin, 1, len, src_file);
 
-    int result = encode(textin, textout, len, codec);
+    long result = encode(textin, textout, len, codec);
 
     if (result != -1) {
-        fwrite(textout, 1, result, dst_file);
+        fwrite(textout, 1, len, dst_file);
+
     } else {
         fprintf(stderr, "Encoding error\n");
     }

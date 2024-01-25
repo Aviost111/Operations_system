@@ -25,7 +25,7 @@ void *createCodec(char key[62]) {
     return codec;
 }
 
-int encode(char *textin, char *textout, int len, void *codec) {
+int encode(char *textin, char *textout, long len, void *codec) {
     if (textin == NULL || textout == NULL || codec == NULL) {
         return -1; // Invalid input parameters
     }
@@ -48,7 +48,6 @@ int encode(char *textin, char *textout, int len, void *codec) {
             textout[i] = ch; // Non-alphanumeric characters remain unchanged
         }
     }
-
     return count;
 }
 
@@ -77,6 +76,7 @@ int decode(char *textin, char *textout, int len, void *codec) {
 
     return count;
 }
+
 
 void freeCodec(void *codec) {
     free(codec);
