@@ -26,30 +26,40 @@ void *createCodec(char key[62]) {
 }
 
 int encode(char *textin, char *textout, long len, void *codec) {
-    if (textin == NULL || textout == NULL || codec == NULL) {
+    // Check for invalid input parameters
+    if (textin == NULL || textout == NULL || codec == NULL || len <= 0) {
         return -1; // Invalid input parameters
     }
 
     int count = 0;
     Codec *c = (Codec *) codec;
 
-    for (int i = 0; i < len; i++) {
+    // Iterate through each character in the input text
+    for (long i = 0; i < len; i++) {
         char ch = textin[i];
+        char encodedChar;
+
+        // Encode the character based on its type
         if (ch >= 'a' && ch <= 'z') {
-            textout[i] = c->key[ch - 'a'];
-            count += 1;
+            encodedChar = c->key[ch - 'a'];
+            count++;
         } else if (ch >= 'A' && ch <= 'Z') {
-            textout[i] = c->key[ch - 'A' + 26];
-            count += 1;
+            encodedChar = c->key[ch - 'A' + 26];
+            count++;
         } else if (ch >= '0' && ch <= '9') {
-            textout[i] = c->key[ch - '0' + 52];
-            count += 1;
+            encodedChar = c->key[ch - '0' + 51];
+            count++;
         } else {
-            textout[i] = ch; // Non-alphanumeric characters remain unchanged
+            encodedChar = ch; // Non-alphanumeric characters remain unchanged
         }
+
+        // Store the encoded character in the output text
+        textout[i] = encodedChar;
     }
-    return count;
+
+    return count; // Return the number of characters encoded
 }
+
 
 int decode(char *textin, char *textout, long len, void *codec) {
     // Check for invalid input parameters
@@ -78,7 +88,7 @@ int decode(char *textin, char *textout, long len, void *codec) {
             } else if (j < 52) {
                 textout[i] = 'A' + j - 26;  // Uppercase letters
             } else {
-                textout[i] = '0' + j - 52;  // Digits
+                textout[i] = '0' + j - 51;  // Digits
             }
             count++;
         } else {
