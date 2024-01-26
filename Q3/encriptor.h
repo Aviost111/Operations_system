@@ -1,5 +1,5 @@
-#ifndef OPERATIONS_SYSTEM_Q3_H
-#define OPERATIONS_SYSTEM_Q3_H
+#ifndef OPERATIONS_SYSTEM_ENCRIPTOR_H
+#define OPERATIONS_SYSTEM_ENCRIPTOR_H
 
 
 void *createCodec(char key[62]);

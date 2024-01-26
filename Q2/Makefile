@@ -1,11 +1,11 @@
 CC = gcc
 
-all: question2
+all: pifagor3
 
-question2: Q2.c
-	$(CC) -o question2 Q2.c -lm
+pifagor3: Q2.c
+	$(CC) -o pifagor3 Q2.c -lm
 
 .PHONY: all clean
 
 clean:
-	rm -f question2
+	rm -f pifagor3
