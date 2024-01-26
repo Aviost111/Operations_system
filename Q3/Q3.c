@@ -51,30 +51,42 @@ int encode(char *textin, char *textout, long len, void *codec) {
     return count;
 }
 
-int decode(char *textin, char *textout, int len, void *codec) {
-    if (textin == NULL || textout == NULL || codec == NULL) {
+int decode(char *textin, char *textout, long len, void *codec) {
+    // Check for invalid input parameters
+    if (textin == NULL || textout == NULL || codec == NULL || len <= 0) {
         return -1; // Invalid input parameters
     }
 
     int count = 0;
     Codec *c = (Codec *) codec;
-    for (int i = 0; i < len; i++) {
+
+    // Iterate through each character in the input text
+    for (long i = 0; i < len; i++) {
         char ch = textin[i];
-        if (ch >= 'a' && ch <= 'z') {
-            textout[i] = strchr(c->key, ch) - c->key + 'a';
-            count += 1;
-        } else if (ch >= 'A' && ch <= 'Z') {
-            textout[i] = strchr(c->key, ch) - c->key + 'A' - 26;
-            count += 1;
-        } else if (ch >= '0' && ch <= '9') {
-            textout[i] = strchr(c->key, ch) - c->key + '0' - 52;
-            count += 1;
+
+        // Search for the character in the key string
+        int j = 0;
+        while (j < 62 && ch != c->key[j]) {
+            j++;
+        }
+
+        // Check if a match was found
+        if (j < 62) {
+            // Found a match, decode the character
+            if (j < 26) {
+                textout[i] = 'a' + j;  // Lowercase letters
+            } else if (j < 52) {
+                textout[i] = 'A' + j - 26;  // Uppercase letters
+            } else {
+                textout[i] = '0' + j - 52;  // Digits
+            }
+            count++;
         } else {
-            textout[i] = ch; // Non-alphanumeric characters remain unchanged
+            // If no match found in the key, keep the original character
+            textout[i] = ch;
         }
     }
-
-    return count;
+    return count; // Return the number of characters decoded
 }
 
 
