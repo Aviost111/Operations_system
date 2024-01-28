@@ -46,7 +46,7 @@ int myunzip(char *file) {
     pid = fork();
 
     if (pid == 0) {
-        execlp("tar", "tar", "xf", "-", NULL);
+        execlp("tar", "tar", "xf","-f", "-", NULL);
         perror("tar");
         exit(1);
     } else {
