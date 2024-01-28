@@ -78,3 +78,6 @@ After executing the commands, follow any prompts that appear during the compress
 - All external utilities are assumed to execute successfully.
 - The input is assumed to be valid, and the programs are designed to operate with a single parameter.
 
+To run all tasks together using the Makefile located outside the folder, simply execute the Makefile with the appropriate command. The Makefile should be configured to run the tasks recursively. You can use the following command in the terminal: `make all`.
+This command will instruct the Makefile to execute all tasks recursively, ensuring that each task and its dependencies are built and executed in the correct order.
+
