@@ -1,68 +1,91 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/wait.h>
 #include <string.h>
+#include <unistd.h>
+#include <wait.h>
 
-#define BUFFER_SIZE 1024
+int myunzip(char *file) {
+    char tmp_template[] = "./archive.XXXXXX";
+    int tmp_fd = mkstemp(tmp_template);
 
+    if (tmp_fd == -1) {
+        perror("mkstemp");
+        exit(1);
+    }
 
-void myunzip(char* file) {
-    // Decrypt the file
-    if (fork() == 0) {
-        // Child process: Execute gpg command for decryption
-        execlp("gpg", "gpg", "--decrypt", file, NULL);
-        perror("execlp");
+    FILE *tmp_file = fdopen(tmp_fd, "w+");
+    if (!tmp_file) {
+        perror("fdopen");
+        exit(1);
+    }
+
+    pid_t pid = fork();
+
+    if (pid == 0) {
+        execlp("gpg", "gpg", "-d", file , NULL);
+        perror("gpg");
         exit(1);
     } else {
-        // Parent process: Wait for the child process to finish
         wait(NULL);
     }
 
-    // Decompress the file
-    char decompressed_file[64];
-    snprintf(decompressed_file, sizeof(decompressed_file), "%s.tar", file);
+    rewind(tmp_file);
 
-    if (fork() == 0) {
-        // Child process: Execute uncompress command
-        execlp("uncompress", "uncompress", "-f", file, "-o", decompressed_file, NULL);
-        perror("execlp");
+    pid = fork();
+
+    if (pid == 0) {
+        execlp("gunzip", "gunzip", "-c", tmp_template, NULL);
+        perror("gunzip");
         exit(1);
     } else {
-        // Parent process: Wait for the child process to finish
         wait(NULL);
     }
 
-    // Extract the archive
-    if (fork() == 0) {
-        // Child process: Execute tar command for extraction
-        execlp("tar", "tar", "-xf", decompressed_file, NULL);
-        perror("execlp");
+    rewind(tmp_file);
+
+    pid = fork();
+
+    if (pid == 0) {
+        execlp("tar", "tar", "xf", "-", NULL);
+        perror("tar");
         exit(1);
     } else {
-        // Parent process: Wait for the child process to finish
         wait(NULL);
     }
 
-    // Delete temporary file
-    unlink(decompressed_file);
+    fclose(tmp_file);
+    unlink(tmp_template);
+
+    return 0;
 }
 
-
-int main(int argc, char* argv[]) {
+int main(int argc, char **argv) {
     if (argc != 2) {
-        printf("Usage: %s <directory> (to archive) or <file> (to unzip)\n", argv[0]);
+        printf("Usage: %s <file>\n", argv[0]);
         exit(1);
     }
 
-    // Check if the file or directory exists
-    if (access(argv[1], F_OK) != 0) {
-        perror("File or directory does not exist");
+    char *filename = argv[1];
+
+    // Validate file
+    if (access(filename, F_OK) != 0) {
+        printf("Error: File %s does not exist\n", filename);
         exit(1);
     }
 
-    myunzip(argv[1]);
+    if (access(filename, R_OK) != 0) {
+        printf("Error: No read permissions for %s\n", filename);
+        exit(1);
+    }
+
+    // Call myunzip
+    int status = myunzip(filename);
+
+    if (status == 0) {
+        printf("Archive extracted successfully\n");
+    } else {
+        printf("Error extracting archive\n");
+    }
 
     return 0;
 }
