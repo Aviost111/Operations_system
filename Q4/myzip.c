@@ -1,118 +1,106 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
-#include <wait.h>
-#include <fcntl.h>
+#include <sys/wait.h>
+#include <string.h>
 
-int myzip(char* dir) {
-    char tmp_template[] = "./archive.XXXXXX";
-    int tmp_fd = mkstemp(tmp_template);
+int main(int argc, char *argv[]) {
 
-    if (tmp_fd == -1) {
-        perror("mkstemp");
-        exit(1);
-    }
-
-    FILE* tmp_file = fdopen(tmp_fd, "w+");
-    if (!tmp_file) {
-        perror("fdopen");
-        exit(1);
-    }
-
-    pid_t pid = fork();
-
-    if (pid == 0) {
-        // Child process: Execute tar command to archive the directory and write to the temporary file
-        dup2(fileno(tmp_file), STDOUT_FILENO);  // Redirect stdout to the temporary file
-        execlp("tar", "tar", "cf", "-", dir, NULL);
-        perror("tar");
-        exit(1);
-    } else {
-        // Parent process: Wait for the child process to finish
-        wait(NULL);
-    }
-
-    // Rewind the temporary file pointer to the beginning
-    rewind(tmp_file);
-
-    int pipe_fd[2];
-    if (pipe(pipe_fd) == -1) {
-        perror("pipe");
-        exit(1);
-    }
-
-    pid = fork();
-    if (pid == 0) {
-        // Child process: Execute compress command, reading from the temporary file
-        close(pipe_fd[0]);  // Close the read end of the pipe
-        dup2(fileno(tmp_file), STDIN_FILENO);  // Redirect stdin to the temporary file
-        dup2(pipe_fd[1], STDOUT_FILENO);  // Redirect stdout to the write end of the pipe
-        execlp("gzip", "gzip", "-c", "-", NULL);
-        perror("compress");
-        exit(1);
-    } else {
-        // Parent process: Wait for the child process to finish
-        wait(NULL);
-        close(pipe_fd[1]);  // Close the write end of the pipe
-
-        // Rewind the temporary file pointer to the beginning
-        rewind(tmp_file);
-
-        // Read from the pipe and write to the temporary file
-        char buffer[1024];
-        ssize_t bytesRead;
-
-        while ((bytesRead = read(pipe_fd[0], buffer, sizeof(buffer))) > 0) {
-            fwrite(buffer, 1, bytesRead, tmp_file);
-        }
-
-        close(pipe_fd[0]);  // Close the read end of the pipe
-    }
-
-    // Rewind the temporary file pointer to the beginning
-    rewind(tmp_file);
-
-    pid = fork();
-
-    if (pid == 0) {
-        // Child process: Execute gpg command to encrypt the temporary file
-        execlp("gpg", "gpg", "-c", tmp_template, NULL);
-        perror("gpg");
-        exit(1);
-    } else {
-        // Parent process: Wait for the child process to finish
-        wait(NULL);
-    }
-
-    fclose(tmp_file);
-    unlink(tmp_template);
-
-    return 0;
-}
-
-int main(int argc, char **argv) {
+    // Check for correct number of arguments
     if (argc != 2) {
-        printf("Usage: %s <directory>\n", argv[0]);
+        printf("Usage: %s <file_to_compress>\n", argv[0]);
         exit(1);
     }
 
-    char *directory = argv[1];
+    // Determine file type and adjust tar command accordingly
+    char *file_extension = strrchr(argv[1], '.');
+    char *tar_args[5];  // Declare tar_args array
 
-    // Validate directory
-    if (access(directory, F_OK) != 0) {
-        printf("Error: Directory %s does not exist\n", directory);
-        exit(1);
-    }
-
-    // Call myzip
-    int status = myzip(directory);
-
-    if (status == 0) {
-        printf("Directory archived successfully\n");
+    if (strcmp(file_extension, ".tar") == 0) {
+        // Already a tar archive, extract it
+        tar_args[0] = "tar";
+        tar_args[1] = "xf";
+        tar_args[2] = "-";  // Read from stdin
+        tar_args[3] = NULL;
     } else {
-        printf("Error archiving directory\n");
+        tar_args[0] = "tar";
+        tar_args[1] = "cf";
+        tar_args[2] = "-";  // Output to stdout
+        tar_args[3] = argv[1];  // Directory to archive
+        tar_args[4] = NULL;
     }
+
+    // Phase 2 (pipe-based implementation)
+    int pipefd1[2];
+    int pipefd2[2];
+
+    if (pipe(pipefd1) == -1) {
+        perror("pipe1");
+        exit(1);
+    }
+    if (pipe(pipefd2) == -1) {
+        perror("pipe2");
+        exit(1);
+    }
+
+    pid_t pid;
+
+    // Child process 1: tar
+    pid = fork();
+    if (pid == 0) {
+        close(1);  // Close stdout
+        dup2(pipefd1[1], 1);  // Redirect stdout to pipefd1[1]
+        close(pipefd1[0]);  // Close unused read end
+        close(pipefd2[0]);  // Close unused pipes
+        close(pipefd2[1]);
+
+        execvp("/bin/tar", tar_args);
+        perror("execvp tar");
+        exit(1);
+    }
+
+    // Child process 2: gzip
+    pid = fork();
+    if (pid == 0) {
+        close(0);  // Close stdin
+        close(1);  // Close stdout
+        dup2(pipefd1[0], 0);  // Redirect stdin to pipefd1[0]
+        dup2(pipefd2[1], 1);  // Redirect stdout to pipefd2[1]
+        close(pipefd1[1]);  // Close unused write end
+        close(pipefd2[0]);  // Close unused read end
+
+        char *gzip_args[] = {"gzip", "-9", NULL};
+        execvp("/bin/gzip", gzip_args);
+        perror("execvp gzip");
+        exit(1);
+    }
+
+    // Child process 3: gpg
+    pid = fork();
+    if (pid == 0) {
+        close(0);  // Close stdin
+        dup2(pipefd2[0], 0);  // Redirect stdin to pipefd2[0]
+        close(pipefd1[0]);  // Close unused pipes
+        close(pipefd1[1]);
+        close(pipefd2[1]);
+
+        char *gpg_args[] = {"gpg", "-c", "-o", "compressed.tar.gz.gpg", NULL};
+        execvp("/bin/gpg", gpg_args);
+        perror("execvp gpg");
+        exit(1);
+    }
+
+    // Parent process: Wait for children and close pipes
+    close(pipefd1[0]);
+    close(pipefd1[1]);
+    close(pipefd2[0]);
+    close(pipefd2[1]);
+
+    wait(NULL);
+    wait(NULL);
+    wait(NULL);
+
+    printf("Compression completed, terminating\n");
 
     return 0;
 }
