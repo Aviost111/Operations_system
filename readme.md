@@ -23,6 +23,8 @@ This section contains two bugs, Bug A and Bug C, for debugging practice.
    For Bug C, use `./bugc` and `./bugc_with_debugger` respectively.
 3. Follow the prompts.
 
+`Note:` We have retained the core files generated during the execution of our programs in the folder to demonstrate that they were successfully created in case any issues arise. 
+
 ### Question 2 - pifagor3 Program
 
 The `pifagor3` program checks if three input side lengths form a Pythagorean triple.
